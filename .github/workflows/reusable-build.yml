@@ -1,0 +1,70 @@
+name: Reusable Build and Push
+
+on:
+  workflow_call:
+    inputs:
+      service:
+        required: true
+        type: string
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU for ARM64
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::506261418156:role/petclinic-dev-github-actions
+          aws-region: eu-central-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tag
+        id: tag
+        run: echo "sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      - name: Build Maven JAR
+        run: |
+          cd spring-petclinic-${{ inputs.service }}
+          ../mvnw package -DskipTests
+
+      - name: Find JAR file
+        id: jar
+        run: |
+          JAR=$(find spring-petclinic-${{ inputs.service }}/target \
+            -name "*.jar" ! -name "*sources*" | head -1)
+          echo "file=$JAR" >> $GITHUB_OUTPUT
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: spring-petclinic-${{ inputs.service }}
+          platforms: linux/arm64
+          push: false
+          load: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/petclinic-dev/${{ inputs.service }}:${{ steps.tag.outputs.sha }}
+          build-args: JAR_FILE=${{ steps.jar.outputs.file }}
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.login-ecr.outputs.registry }}/petclinic-dev/${{ inputs.service }}:${{ steps.tag.outputs.sha }}
+          format: table
+          exit-code: 1
+          severity: CRITICAL
+
+      - name: Push image to ECR
+        run: |
+          docker push ${{ steps.login-ecr.outputs.registry }}/petclinic-dev/${{ inputs.service }}:${{ steps.tag.outputs.sha }}
