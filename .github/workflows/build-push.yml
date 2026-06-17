@@ -130,42 +130,38 @@ jobs:
     if: always() && !failure() && !cancelled()
     runs-on: ubuntu-latest
     steps:
-      - name: Build services list
-        id: services
+      - name: Build services list and notify
+        env:
+          CS: ${{ needs.detect-changes.outputs['config-server'] }}
+          DS: ${{ needs.detect-changes.outputs['discovery-server'] }}
+          AG: ${{ needs.detect-changes.outputs['api-gateway'] }}
+          CU: ${{ needs.detect-changes.outputs['customers-service'] }}
+          VI: ${{ needs.detect-changes.outputs['visits-service'] }}
+          VE: ${{ needs.detect-changes.outputs['vets-service'] }}
+          GE: ${{ needs.detect-changes.outputs['genai-service'] }}
+          AS: ${{ needs.detect-changes.outputs['admin-server'] }}
+          SHA: ${{ github.sha }}
+          TOKEN: ${{ secrets.PLATFORM_REPO_TOKEN }}
         run: |
-          SERVICES="[]"
-          if [ "${{ needs.detect-changes.outputs['config-server'] }}" == "true" ]; then
-            SERVICES=$(echo "$SERVICES" | jq '. + ["config-server"]')
+          SERVICES=""
+          [ "$CS" == "true" ] && SERVICES="${SERVICES},\"config-server\""
+          [ "$DS" == "true" ] && SERVICES="${SERVICES},\"discovery-server\""
+          [ "$AG" == "true" ] && SERVICES="${SERVICES},\"api-gateway\""
+          [ "$CU" == "true" ] && SERVICES="${SERVICES},\"customers-service\""
+          [ "$VI" == "true" ] && SERVICES="${SERVICES},\"visits-service\""
+          [ "$VE" == "true" ] && SERVICES="${SERVICES},\"vets-service\""
+          [ "$GE" == "true" ] && SERVICES="${SERVICES},\"genai-service\""
+          [ "$AS" == "true" ] && SERVICES="${SERVICES},\"admin-server\""
+          
+          # Remove leading comma
+          SERVICES="[${SERVICES#,}]"
+          echo "Services: $SERVICES"
+          
+          if [ "$SERVICES" != "[]" ]; then
+            curl -s -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer $TOKEN" \
+              https://api.github.com/repos/ukpabi-Joy/-petclinic-platform/dispatches \
+              -d "{\"event_type\":\"app-image-built\",\"client_payload\":{\"sha\":\"${SHA}\",\"services\":${SERVICES}}}"
+            echo "Dispatched to platform repo"
           fi
-          if [ "${{ needs.detect-changes.outputs['discovery-server'] }}" == "true" ]; then
-            SERVICES=$(echo "$SERVICES" | jq '. + ["discovery-server"]')
-          fi
-          if [ "${{ needs.detect-changes.outputs['api-gateway'] }}" == "true" ]; then
-            SERVICES=$(echo "$SERVICES" | jq '. + ["api-gateway"]')
-          fi
-          if [ "${{ needs.detect-changes.outputs['customers-service'] }}" == "true" ]; then
-            SERVICES=$(echo "$SERVICES" | jq '. + ["customers-service"]')
-          fi
-          if [ "${{ needs.detect-changes.outputs['visits-service'] }}" == "true" ]; then
-            SERVICES=$(echo "$SERVICES" | jq '. + ["visits-service"]')
-          fi
-          if [ "${{ needs.detect-changes.outputs['vets-service'] }}" == "true" ]; then
-            SERVICES=$(echo "$SERVICES" | jq '. + ["vets-service"]')
-          fi
-          if [ "${{ needs.detect-changes.outputs['genai-service'] }}" == "true" ]; then
-            SERVICES=$(echo "$SERVICES" | jq '. + ["genai-service"]')
-          fi
-          if [ "${{ needs.detect-changes.outputs['admin-server'] }}" == "true" ]; then
-            SERVICES=$(echo "$SERVICES" | jq '. + ["admin-server"]')
-          fi
-          echo "list=$SERVICES" >> "$GITHUB_OUTPUT"
-
-      - name: Trigger platform repo image tag update
-        if: steps.services.outputs.list != '[]'
-        uses: peter-evans/repository-dispatch@v3
-        with:
-          token: ${{ secrets.PLATFORM_REPO_TOKEN }}
-          repository: ukpabi-Joy/-petclinic-platform
-          event-type: app-image-built
-          client-payload: >-
-            {"sha": "${{ github.sha }}", "services": ${{ steps.services.outputs.list }}}
