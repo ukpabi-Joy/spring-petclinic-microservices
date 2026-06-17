@@ -51,6 +51,7 @@ jobs:
     uses: ./.github/workflows/reusable-build.yml
     with:
       service: config-server
+      port: "8888"
     secrets: inherit
 
   build-discovery-server:
@@ -59,6 +60,7 @@ jobs:
     uses: ./.github/workflows/reusable-build.yml
     with:
       service: discovery-server
+      port: "8761"
     secrets: inherit
 
   build-api-gateway:
@@ -67,6 +69,7 @@ jobs:
     uses: ./.github/workflows/reusable-build.yml
     with:
       service: api-gateway
+      port: "8080"
     secrets: inherit
 
   build-customers-service:
@@ -75,6 +78,7 @@ jobs:
     uses: ./.github/workflows/reusable-build.yml
     with:
       service: customers-service
+      port: "8081"
     secrets: inherit
 
   build-visits-service:
@@ -83,6 +87,7 @@ jobs:
     uses: ./.github/workflows/reusable-build.yml
     with:
       service: visits-service
+      port: "8082"
     secrets: inherit
 
   build-vets-service:
@@ -91,6 +96,7 @@ jobs:
     uses: ./.github/workflows/reusable-build.yml
     with:
       service: vets-service
+      port: "8083"
     secrets: inherit
 
   build-genai-service:
@@ -99,6 +105,7 @@ jobs:
     uses: ./.github/workflows/reusable-build.yml
     with:
       service: genai-service
+      port: "8084"
     secrets: inherit
 
   build-admin-server:
@@ -107,6 +114,7 @@ jobs:
     uses: ./.github/workflows/reusable-build.yml
     with:
       service: admin-server
+      port: "9090"
     secrets: inherit
 
   notify-platform:
@@ -154,6 +162,7 @@ jobs:
           echo "list=$SERVICES" >> $GITHUB_OUTPUT
 
       - name: Trigger platform repo image tag update
+        if: steps.services.outputs.list != '[]'
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.PLATFORM_REPO_TOKEN }}

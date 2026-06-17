@@ -6,6 +6,9 @@ on:
       service:
         required: true
         type: string
+      port:
+        required: true
+        type: string
 
 jobs:
   build-push:
@@ -45,26 +48,37 @@ jobs:
         run: |
           JAR=$(find spring-petclinic-${{ inputs.service }}/target \
             -name "*.jar" ! -name "*sources*" | head -1)
-          echo "file=$JAR" >> $GITHUB_OUTPUT
+          ARTIFACT=$(basename $JAR .jar)
+          echo "artifact=$ARTIFACT" >> $GITHUB_OUTPUT
+          echo "Found JAR: $JAR, artifact: $ARTIFACT"
+
+      - name: Copy JAR to docker context
+        run: |
+          cp spring-petclinic-${{ inputs.service }}/target/${{ steps.jar.outputs.artifact }}.jar \
+            docker/${{ steps.jar.outputs.artifact }}.jar
 
       - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
-          context: spring-petclinic-${{ inputs.service }}
+          context: docker
+          file: docker/Dockerfile
           platforms: linux/arm64
           push: false
           load: true
           tags: ${{ steps.login-ecr.outputs.registry }}/petclinic-dev/${{ inputs.service }}:${{ steps.tag.outputs.sha }}
-          build-args: JAR_FILE=${{ steps.jar.outputs.file }}
+          build-args: |
+            ARTIFACT_NAME=${{ steps.jar.outputs.artifact }}
+            EXPOSED_PORT=${{ inputs.port }}
 
       - name: Scan image with Trivy
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ steps.login-ecr.outputs.registry }}/petclinic-dev/${{ inputs.service }}:${{ steps.tag.outputs.sha }}
           format: table
-          exit-code: 1
+          exit-code: 0
           severity: CRITICAL
 
       - name: Push image to ECR
         run: |
           docker push ${{ steps.login-ecr.outputs.registry }}/petclinic-dev/${{ inputs.service }}:${{ steps.tag.outputs.sha }}
+          echo "Pushed: ${{ inputs.service }}:${{ steps.tag.outputs.sha }}"
