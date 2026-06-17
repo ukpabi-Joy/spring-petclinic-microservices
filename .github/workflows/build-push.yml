@@ -22,7 +22,6 @@ jobs:
       admin-server: ${{ steps.filter.outputs.admin-server }}
     steps:
       - uses: actions/checkout@v4
-
       - name: Detect changed services
         uses: dorny/paths-filter@v3
         id: filter
@@ -134,32 +133,32 @@ jobs:
       - name: Build services list
         id: services
         run: |
-          SERVICES=[]
+          SERVICES="[]"
           if [ "${{ needs.detect-changes.outputs['config-server'] }}" == "true" ]; then
-            SERVICES=$(echo $SERVICES | jq '. + ["config-server"]')
+            SERVICES=$(echo "$SERVICES" | jq '. + ["config-server"]')
           fi
           if [ "${{ needs.detect-changes.outputs['discovery-server'] }}" == "true" ]; then
-            SERVICES=$(echo $SERVICES | jq '. + ["discovery-server"]')
+            SERVICES=$(echo "$SERVICES" | jq '. + ["discovery-server"]')
           fi
           if [ "${{ needs.detect-changes.outputs['api-gateway'] }}" == "true" ]; then
-            SERVICES=$(echo $SERVICES | jq '. + ["api-gateway"]')
+            SERVICES=$(echo "$SERVICES" | jq '. + ["api-gateway"]')
           fi
           if [ "${{ needs.detect-changes.outputs['customers-service'] }}" == "true" ]; then
-            SERVICES=$(echo $SERVICES | jq '. + ["customers-service"]')
+            SERVICES=$(echo "$SERVICES" | jq '. + ["customers-service"]')
           fi
           if [ "${{ needs.detect-changes.outputs['visits-service'] }}" == "true" ]; then
-            SERVICES=$(echo $SERVICES | jq '. + ["visits-service"]')
+            SERVICES=$(echo "$SERVICES" | jq '. + ["visits-service"]')
           fi
           if [ "${{ needs.detect-changes.outputs['vets-service'] }}" == "true" ]; then
-            SERVICES=$(echo $SERVICES | jq '. + ["vets-service"]')
+            SERVICES=$(echo "$SERVICES" | jq '. + ["vets-service"]')
           fi
           if [ "${{ needs.detect-changes.outputs['genai-service'] }}" == "true" ]; then
-            SERVICES=$(echo $SERVICES | jq '. + ["genai-service"]')
+            SERVICES=$(echo "$SERVICES" | jq '. + ["genai-service"]')
           fi
           if [ "${{ needs.detect-changes.outputs['admin-server'] }}" == "true" ]; then
-            SERVICES=$(echo $SERVICES | jq '. + ["admin-server"]')
+            SERVICES=$(echo "$SERVICES" | jq '. + ["admin-server"]')
           fi
-          echo "list=$SERVICES" >> $GITHUB_OUTPUT
+          echo "list=$SERVICES" >> "$GITHUB_OUTPUT"
 
       - name: Trigger platform repo image tag update
         if: steps.services.outputs.list != '[]'
@@ -168,8 +167,5 @@ jobs:
           token: ${{ secrets.PLATFORM_REPO_TOKEN }}
           repository: ukpabi-Joy/-petclinic-platform
           event-type: app-image-built
-          client-payload: |
-            {
-              "sha": "${{ github.sha }}",
-              "services": ${{ steps.services.outputs.list }}
-            }
+          client-payload: >-
+            {"sha": "${{ github.sha }}", "services": ${{ steps.services.outputs.list }}}
